@@ -41,14 +41,30 @@ timer_handler:
 ; -------------------------------
 keyboard_handler:
     push ax
-    in al, 0x60           ; Read scancode from keyboard
-    mov ah, 0x0E
-    mov al, '*'           ; Display asterisk for any key press
-    int 0x10
+    push bx
+    push cx
+    push dx
 
-    mov al, 0x20          ; Send EOI to PIC
-    out 0x20, al
+    in al, 0x60           ; Read scancode
+    cmp al, 58
+    ja .done              ; Ignore scancodes beyond table
 
+    mov bx, ax
+    mov si, scancode_table
+    xor ah, ah
+    mov al, [si + bx]     ; Translate to ASCII
+    cmp al, 0
+    je .done              ; Skip non-printables
+
+    call buffer_put       ; Store in ring buffer
+
+.done:
+    mov al, 0x20
+    out 0x20, al          ; Send EOI to PIC
+
+    pop dx
+    pop cx
+    pop bx
     pop ax
     iret
 
@@ -61,8 +77,8 @@ install_timer_handler:
     mov ds, ax
     mov es, ax
 
-    mov word [0x0020], timer_handler   ; Offset for INT 08h
-    mov word [0x0022], cs              ; Segment for INT 08h
+    mov word [0x0020], timer_handler
+    mov word [0x0022], cs
     sti
     ret
 
@@ -75,8 +91,8 @@ install_keyboard_handler:
     mov ds, ax
     mov es, ax
 
-    mov word [0x0024], keyboard_handler   ; Offset for INT 09h
-    mov word [0x0026], cs                 ; Segment for INT 09h
+    mov word [0x0024], keyboard_handler
+    mov word [0x0026], cs
     sti
     ret
 
@@ -84,8 +100,8 @@ install_keyboard_handler:
 ; Enable IRQ0 in PIC
 ; -------------------------------
 enable_irq0:
-    in al, 0x21           ; Read PIC mask
-    and al, 0xFE          ; Clear bit 0 (IRQ0)
+    in al, 0x21
+    and al, 0xFE
     out 0x21, al
     ret
 
@@ -93,8 +109,8 @@ enable_irq0:
 ; Enable IRQ1 in PIC
 ; -------------------------------
 enable_irq1:
-    in al, 0x21           ; Read PIC mask
-    and al, 0xFD          ; Clear bit 1 (IRQ1)
+    in al, 0x21
+    and al, 0xFD
     out 0x21, al
     ret
 
@@ -112,4 +128,91 @@ print_string:
 .done:
     ret
 
+; -------------------------------
+; Keyboard Ring Buffer
+; -------------------------------
+buffer_size equ 64
+
+keyboard_buffer: times buffer_size db 0
+buffer_head: dw 0
+buffer_tail: dw 0
+
+; -------------------------------
+; Put Character in Buffer
+; -------------------------------
+buffer_put:
+    push ax
+    push bx
+    push cx
+    push dx
+
+    mov bx, [buffer_head]
+    mov cx, [buffer_tail]
+    mov dx, buffer_size
+    inc bx
+    cmp bx, dx
+    jne .skip_wrap
+    xor bx, bx
+.skip_wrap:
+    cmp bx, cx
+    je .full              ; Buffer full, drop character
+
+    mov si, keyboard_buffer
+    add si, [buffer_head]
+    mov [si], al
+    mov [buffer_head], bx
+
+.full:
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+
+; -------------------------------
+; Get Character from Buffer
+; -------------------------------
+buffer_get:
+    push ax
+    push bx
+    push cx
+    push dx
+
+    mov bx, [buffer_tail]
+    cmp bx, [buffer_head]
+    je .empty             ; Buffer empty
+
+    mov si, keyboard_buffer
+    add si, bx
+    mov al, [si]
+    inc bx
+    cmp bx, buffer_size
+    jne .skip_wrap
+    xor bx, bx
+.skip_wrap:
+    mov [buffer_tail], bx
+    jmp .done
+
+.empty:
+    mov al, 0             ; Return null if empty
+
+.done:
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+
+; -------------------------------
+; Scancode to ASCII Table
+; -------------------------------
+scancode_table:
+    db 0, 27, '1','2','3','4','5','6','7','8','9','0','-','=', 8, 9
+    db 'q','w','e','r','t','y','u','i','o','p','[',']',13, 0,'a','s'
+    db 'd','f','g','h','j','k','l',';',39,'`', 0,'\\','z','x','c','v'
+    db 'b','n','m',',','.','/', 0, '*', 0, ' '
+
+; -------------------------------
+; Boot Message
+; -------------------------------
 msg db "8088/OS Kernel Initialized", 0
