@@ -14,6 +14,9 @@ start:
     call enable_irq1
     call install_syscall_handler
 
+    call load_shell
+    call jump_to_shell
+
     sti
 
     mov si, msg
@@ -82,6 +85,8 @@ syscall_handler:
     je .get_char
     cmp ah, 0x02
     je .print_char
+    cmp ah, 0x03
+    je .malloc_syscall
     jmp .done
 
 .get_char:
@@ -91,6 +96,11 @@ syscall_handler:
 .print_char:
     mov ah, 0x0E
     int 0x10
+    jmp .done
+
+.malloc_syscall:
+    call malloc
+    ; ES:DI contains pointer to allocated block
     jmp .done
 
 .done:
@@ -159,6 +169,25 @@ enable_irq1:
     and al, 0xFD
     out 0x21, al
     ret
+
+; -------------------------------
+; Load Shell from Disk (sector 3)
+; -------------------------------
+load_shell:
+    mov ax, 0x0201
+    mov bx, 0x0000
+    mov cx, 0x0003
+    mov dx, 0x0000
+    mov ax, 0x2000
+    mov es, ax
+    int 0x13
+    ret
+
+; -------------------------------
+; Jump to Shell at 0x2000:0000
+; -------------------------------
+jump_to_shell:
+    jmp 0x2000:0000
 
 ; -------------------------------
 ; Print String Routine
@@ -241,6 +270,39 @@ buffer_get:
 
 .empty:
     mov al, 0
+
+.done:
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+
+; -------------------------------
+; Simple Bump Allocator
+; -------------------------------
+free_segment dw 0x3000
+free_offset  dw 0x0000
+
+; Input: BX = size in bytes
+; Output: ES:DI = pointer to allocated block
+malloc:
+    push ax
+    push bx
+    push cx
+    push dx
+
+    mov ax, [free_segment]
+    mov es, ax
+    mov di, [free_offset]
+
+    add [free_offset], bx
+    jc .segment_wrap
+    jmp .done
+
+.segment_wrap:
+    add [free_segment], 0x0010
+    mov [free_offset], 0x0000
 
 .done:
     pop dx
