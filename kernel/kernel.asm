@@ -119,7 +119,7 @@ install_timer_handler:
     mov ds, ax
     mov es, ax
 
-    mov word [0x0000*4 + 0], timer_handler
+    mov word [0x0020], timer_handler
     mov word [0x0022], cs
     sti
     ret
