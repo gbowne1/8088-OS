@@ -140,6 +140,7 @@ syscall_handler:
     mov ax, [tick_count]
     jmp .done
 
+
 .exec:
     push ax
     push bx
@@ -147,13 +148,13 @@ syscall_handler:
     push dx
     push es
 
+    mov dl, [boot_drive]   ; use boot drive
+    xor dh, dh             ; head 0 for simple case
     mov bx, 0x0000
-    mov cx, ax
-    add cx, 3
-    mov dx, 0x0000
-    mov ax, 0x3000
-    mov es, ax
-    mov ax, 0x0201
+    mov es, 0x3000
+    xor ch, ch
+    mov cl, al             ; sector number from caller
+    mov ax, 0x0201         ; read 1 sector
     int 0x13
 
     pop es
@@ -161,7 +162,6 @@ syscall_handler:
     pop cx
     pop bx
     pop ax
-
     jmp 0x3000:0000
 
 .done:
