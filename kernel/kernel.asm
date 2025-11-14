@@ -387,4 +387,4 @@ scancode_table:
 ; -------------------------------
 ; Boot Message
 ; -------------------------------
-msg db "8088/OS Kernel Initialized", 
+msg db "8088/OS Kernel Initialized", 0
