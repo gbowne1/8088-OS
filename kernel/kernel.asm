@@ -111,6 +111,8 @@ syscall_handler:
 
 .malloc_syscall:
     call malloc
+    mov ax, es
+    mov bx, di
     jmp .done
 
 .read_line:
