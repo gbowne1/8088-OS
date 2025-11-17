@@ -112,8 +112,15 @@ syscall_handler:
     jmp .done
 
 .malloc_syscall:
-    call malloc
-    mov ax, es
+    ; Assumption: The requested size is in CX when the syscall is made.
+    push cx          ; Save CX since malloc needs BX for size
+    mov bx, cx       ; Move the requested size from CX into BX
+    call malloc      ; Perform the allocation (which uses BX)
+    pop cx           ; Restore CX
+
+    ; Return the allocated segment (ES) in AX and offset (DI) in BX
+    ; NOTE: malloc currently returns segment in ES and offset in DI
+    mov ax, es       
     mov bx, di
     jmp .done
 
