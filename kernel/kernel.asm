@@ -2,7 +2,7 @@ org 0x0000
 
 start:
     cli
-    mov ax, 0x1000
+    mov ax, 0x0800
     mov ds, ax
     mov es, ax
     mov ss, ax
