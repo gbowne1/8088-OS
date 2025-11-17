@@ -8,6 +8,8 @@ start:
     mov ss, ax
     mov sp, 0xFFFE
 
+    call init_pic
+
     call install_timer_handler
     call enable_irq0
     call install_keyboard_handler
@@ -185,8 +187,8 @@ install_timer_handler:
     mov ax, cs
     mov ds, ax
     mov es, ax
-    mov word [0x0020], timer_handler
-    mov word [0x0022], cs
+    mov word [0x0080], timer_handler
+    mov word [0x0082], cs
     sti
     ret
 
@@ -198,8 +200,8 @@ install_keyboard_handler:
     mov ax, cs
     mov ds, ax
     mov es, ax
-    mov word [0x0024], keyboard_handler
-    mov word [0x0026], cs
+    mov word [0x0084], keyboard_handler
+    mov word [0x0086], cs
     sti
     ret
 
