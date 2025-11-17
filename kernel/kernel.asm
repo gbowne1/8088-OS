@@ -185,7 +185,7 @@ install_timer_handler:
     mov ax, cs
     mov ds, ax
     mov es, ax
-    mov word [0x0000*4 + 0], timer_handler
+    mov word [0x0020], timer_handler
     mov word [0x0022], cs
     sti
     ret
@@ -232,6 +232,42 @@ enable_irq1:
     in al, 0x21
     and al, 0xFD
     out 0x21, al
+    ret
+
+; ---------------------------------
+; PIC Initialization (Remap IRQs)
+; ---------------------------------
+init_pic:
+    pushf
+    cli ; Disable interrupts during PIC setup
+
+    ; ICW1: Start Initialization Sequence
+    ; 0x11: ICW1 required, single 8259 (not cascaded), edge-triggered mode
+    mov al, 0x11
+    out 0x20, al    ; Write to Master PIC Command Port
+
+    ; ICW2: Set New Vector Offset
+    ; 0x20 (decimal 32): Remap IRQs 0-7 to start at INT 20h
+    ; INT 20h-27h are safe from CPU exceptions
+    mov al, 0x20
+    out 0x21, al    ; Write to Master PIC Data Port
+
+    ; ICW3: Cascade Information (Not used in single PIC setup, but required)
+    ; 0x04: Indicates that slave PIC is on IRQ2 (not relevant for single, but standard for compatibility)
+    mov al, 0x04
+    out 0x21, al    ; Write to Master PIC Data Port
+
+    ; ICW4: Mode of Operation
+    ; 0x01: 8086/8088 mode (required), normal EOI
+    mov al, 0x01
+    out 0x21, al    ; Write to Master PIC Data Port
+
+    ; Set Default Mask (Disable all IRQs initially)
+    ; 0xFF: Mask all IRQ lines
+    mov al, 0xFF
+    out 0x21, al    ; Write to Master PIC Data Port
+
+    popf ; Restore interrupt flag
     ret
 
 ; -------------------------------
