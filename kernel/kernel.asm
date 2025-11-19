@@ -361,12 +361,12 @@ load_shell:
     push dx
     push es
 
+    mov ax, 0x2000
+    mov es, ax
     mov ax, 0x0201
     mov bx, 0x0000
     mov cx, 0x0005
     mov dx, 0x0000
-    mov ax, 0x2000
-    mov es, ax
     int 0x13
 
     pop es
