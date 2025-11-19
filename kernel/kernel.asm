@@ -184,6 +184,27 @@ syscall_handler:
     iret
 
 ; -------------------------------
+; IRQ 3-7 Handlers (INT 23h - INT 27h)
+; -------------------------------
+
+; Generic handler template for IRQs 3-7
+irq_handler_template:
+    pusha                   ; Save all general-purpose registers
+    ; Add specific IRQ logic here (e.g., handling a COM port interrupt)
+    
+    mov al, 0x20
+    out 0x20, al            ; EOI to master PIC
+    
+    popa                    ; Restore all general-purpose registers
+    iret                    ; Return from interrupt
+
+irq3_handler: equ irq_handler_template
+irq4_handler: equ irq_handler_template
+irq5_handler: equ irq_handler_template
+irq6_handler: equ irq_handler_template
+irq7_handler: equ irq_handler_template
+
+; -------------------------------
 ; Install Timer Handler into IVT
 ; -------------------------------
 install_timer_handler:
@@ -223,6 +244,38 @@ install_syscall_handler:
     ret
 
 ; -------------------------------
+; Install IRQ 3-7 Handlers into IVT
+; -------------------------------
+install_irq_handlers_3_to_7:
+    cli
+    mov ax, cs
+    mov ds, ax
+    mov es, ax
+    
+    ; IRQ3 (INT 23h - IVT offset 0x8C)
+    mov word [0x008C], irq3_handler
+    mov word [0x008E], cs
+    
+    ; IRQ4 (INT 24h - IVT offset 0x90)
+    mov word [0x0090], irq4_handler
+    mov word [0x0092], cs
+    
+    ; IRQ5 (INT 25h - IVT offset 0x94)
+    mov word [0x0094], irq5_handler
+    mov word [0x0096], cs
+    
+    ; IRQ6 (INT 26h - IVT offset 0x98)
+    mov word [0x0098], irq6_handler
+    mov word [0x009A], cs
+    
+    ; IRQ7 (INT 27h - IVT offset 0x9C)
+    mov word [0x009C], irq7_handler
+    mov word [0x009E], cs
+    
+    sti
+    ret
+
+; -------------------------------
 ; Enable IRQ0 in PIC
 ; -------------------------------
 enable_irq0:
@@ -237,6 +290,21 @@ enable_irq0:
 enable_irq1:
     in al, 0x21
     and al, 0xFD
+    out 0x21, al
+    ret
+
+; -------------------------------
+; Enable IRQ 3-7 in PIC
+; -------------------------------
+enable_irq3_to_7:
+    in al, 0x21
+    ; Mask to UNMASK bits 3, 4, 5, 6, 7: 11111111_2 & 00000111_2 = 0x07
+    ; More readable: AND with the complement of the bits you want unmasked.
+    ; Bits to unmask: 0b11111000 (0xF8)
+    ; We want to clear bits 3, 4, 5, 6, 7.
+    ; Bits to unmask: 3, 4, 5, 6, 7 -> 0b11111000 = 0xF8
+    ; To clear these bits, we AND with the complement: NOT 0xF8 = 0x07.
+    and al, 0x07                    ; Clear bits 3, 4, 5, 6, 7
     out 0x21, al
     ret
 
