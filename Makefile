@@ -5,7 +5,7 @@ USER_DIR       = user
 BUILD_DIR      = build
 
 # Output files
-BOOTLOADER_BIN = $(BUILD_DIR)/bootloader.bin
+BOOTLOADER_BIN = $(BUILD_DIR)/boot.bin
 KERNEL_BIN     = $(BUILD_DIR)/kernel.bin
 SHELL_BIN      = $(BUILD_DIR)/shell.bin
 FLOPPY_IMG     = $(BUILD_DIR)/floppy.img
@@ -23,7 +23,7 @@ $(FLOPPY_IMG): $(BOOTLOADER_BIN) $(KERNEL_BIN) $(SHELL_BIN)
     dd if=$(KERNEL_BIN)     of=$(FLOPPY_IMG) bs=512 seek=1 conv=notrunc
     dd if=$(SHELL_BIN)      of=$(FLOPPY_IMG) bs=512 seek=2 conv=notrunc
 
-$(BOOTLOADER_BIN): $(BOOTLOADER_DIR)/bootloader.asm
+$(BOOTLOADER_BIN): $(BOOTLOADER_DIR)/boot.asm
     $(ASM) $(ASMFLAGS) $< -o $@
 
 $(KERNEL_BIN): $(KERNEL_DIR)/kernel.asm
