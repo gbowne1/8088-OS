@@ -1,4 +1,4 @@
-joorg 0x0000
+org 0x0000
 
 start:
     cli
@@ -7,6 +7,8 @@ start:
     mov es, ax
     mov ss, ax
     mov sp, 0xFFFE
+
+    mov [boot_drive], dl
 
     call init_pic
 
