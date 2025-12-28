@@ -3,25 +3,17 @@ org 0x0000
 buffer_size equ 64
 
 ; -------------------------------
-; Data Section
-; -------------------------------
-prompt db "8088/OS Shell> ", 0
-unknown_cmd db "Unknown command", 13, 10, 0
-echo_cmd db "echo", 0
-clear_cmd db "clear", 0
-help_cmd db "help", 0
-help_text db "Commands: echo, clear, help", 13, 10, 0
-
-line_buffer: times buffer_size db 0
-
-; -------------------------------
 ; Entry Point
 ; -------------------------------
 start:
+    mov ax, 0x2000
+    mov ds, ax
+    mov es, ax
+
+.loop:
     mov si, prompt
     call print_string
 
-.loop:
     call read_line
     call parse_command
     jmp .loop
@@ -53,6 +45,9 @@ read_line:
 ; Parse and Execute Command
 ; -------------------------------
 parse_command:
+    mov si, line_buffer
+    call zerospaces
+    
     mov si, line_buffer
     mov di, echo_cmd
     call strcmp
@@ -88,6 +83,8 @@ parse_command:
 ; Echo Handler
 ; -------------------------------
 echo_handler:
+    mov si, string_crlf
+    call print_string
     mov si, line_buffer + 5
     call print_string
     ret
@@ -141,6 +138,7 @@ strcmp:
     jmp .next
 .notequal:
     mov al, 1
+.exit
     pop di
     pop si
     ret
@@ -149,3 +147,30 @@ strcmp:
     pop di
     pop si
     ret
+
+zerospaces:
+    push si
+.next
+    lodsb
+    cmp al,0
+    je .exit
+    cmp al,' '
+    jne .next
+    mov byte [si-1], 0
+    jmp .next
+ .exit
+    pop si
+    ret
+    
+; -------------------------------
+; Data Section
+; -------------------------------
+prompt db 0x0d,0x0a,"8088/OS Shell> ", 0
+unknown_cmd db 0x0d, 0x0a, "Unknown command", 13, 10, 0
+echo_cmd db "echo", 0
+clear_cmd db "clear", 0
+help_cmd db "help", 0
+help_text db 0x0d, 0x0a, "Commands: echo, clear, help", 13, 10, 0
+string_crlf db 0x0d, 0x0a, 0
+    
+line_buffer: times buffer_size db 0
