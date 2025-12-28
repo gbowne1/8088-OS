@@ -11,58 +11,73 @@ start:
 
     mov [boot_drive], dl
 
-    call init_pic
-
-    call install_timer_handler
-    call enable_irq0
+    ;call init_pic
+    ;call install_timer_handler
+    ;call enable_irq0
     call install_keyboard_handler
-    call enable_irq1
-
-    call install_irq_handlers_3_to_7
-    call enable_irq3_to_7
+    ;call enable_irq1
+    ;call install_irq_handlers_3_to_7
+    ;call enable_irq3_to_7
 
     call install_syscall_handler
-
-    call load_shell
-    call jump_to_shell
 
     sti
 
     mov si, msg
     call print_string
 
+    call load_shell
+    call jump_to_shell
+
 hang:
     jmp hang
 
-; -------------------------------
-; Timer Interrupt Handler (INT 08h)
-; -------------------------------
-tick_count dw 0
 
-timer_handler:
-    push ax
-    inc word [tick_count]
-    mov al, 0x20
-    out 0x20, al      ; EOI to master PIC
-    pop ax
-    iret
+; ---------------------------------
+; Install Keyboard Handler into IVT
+; ---------------------------------
+install_keyboard_handler:
+    push ds
+    xor ax, ax
+    mov ds, ax
+    ;mov word [0x0084], keyboard_handler
+    ;mov word [0x0086], cs
+    mov word [0x24], keyboard_handler
+    mov word [0x26], cs
+    pop ds
+    ret
 
-; -------------------------------
+; -------------------------------------
+; Install System Call Handler (INT 60h)
+; -------------------------------------
+install_syscall_handler:
+    push ds
+    xor ax, ax
+    mov ds, ax
+    mov word [0x0180], syscall_handler
+    mov word [0x0182], cs
+    pop ds
+    ret
+
+; ------------------------------------
 ; Keyboard Interrupt Handler (INT 09h)
-; -------------------------------
+; ------------------------------------
 keyboard_handler:
-    push ax
-    push bx
-    push cx
-    push dx
+    pusha                            ;N.B >= 80186 instruction
+    push ds
+    push es
+
+    mov ax, cs
+    mov ds, ax
+    mov es, ax
 
     in al, 0x60
     cmp al, 58
     ja .done
 
+    xor ah, ah
     mov bx, ax
     mov si, scancode_table
-    xor ah, ah
     mov al, [si + bx]
     cmp al, 0
     je .done
@@ -73,22 +88,24 @@ keyboard_handler:
     mov al, 0x20
     out 0x20, al
 
-    pop dx
-    pop cx
-    pop bx
-    pop ax
+    pop es
+    pop ds
+    popa                             ;N.B >= 80186 instruction
     iret
 
-; -------------------------------
+key_tmp:    db 0
+; -----------------------------
 ; System Call Handler (INT 60h)
-; -------------------------------
+; -----------------------------
 syscall_handler:
+    pusha
+    push ds
+    push es
     push ax
-    push bx
-    push cx
-    push dx
-    push si
-    push di
+    mov ax, cs
+    mov ds, ax
+    mov es, ax
+    pop ax
 
     cmp ah, 0x01
     je .get_char
@@ -124,7 +141,7 @@ syscall_handler:
 
     ; Return the allocated segment (ES) in AX and offset (DI) in BX
     ; NOTE: malloc currently returns segment in ES and offset in DI
-    mov ax, es       
+    mov ax, es
     mov bx, di
     jmp .done
 
@@ -183,11 +200,128 @@ syscall_handler:
     jmp 0x3000:0000
 
 .done:
-    pop di
-    pop si
+    pop es
+    pop ds
+    mov byte cs:[key_tmp], al
+    popa
+    mov al, byte cs:[key_tmp]
+    iret
+
+
+; -------------------------------
+; Jump to Shell at 0x2000:0000
+; -------------------------------
+jump_to_shell:
+    jmp 0x2000:0000
+
+; -------------------------------
+; Print String Routine
+; -------------------------------
+print_string:
+    mov ah, 0x0E
+.next_char:
+    lodsb
+    cmp al, 0
+    je .done
+    int 0x10
+    jmp .next_char
+.done:
+    ret
+
+; -------------------------------
+; Keyboard Ring Buffer
+; -------------------------------
+buffer_size equ 64
+
+keyboard_buffer: times buffer_size db 0
+buffer_head: dw 0
+buffer_tail: dw 0
+
+buffer_put:
+    mov bx, [buffer_head]
+    mov cx, [buffer_tail]
+    mov dx, buffer_size
+    inc bx
+    cmp bx, dx
+    jne .skip_wrap
+    xor bx, bx
+.skip_wrap:
+    cmp bx, cx
+    je .full
+
+    mov si, keyboard_buffer
+    add si, [buffer_head]
+    mov [si], al
+    mov [buffer_head], bx
+
+.full:
+    ret
+
+buffer_get:
+    mov bx, [buffer_tail]
+    cmp bx, [buffer_head]
+    je .empty
+
+    mov si, keyboard_buffer
+    add si, bx
+    mov al, [si]
+    inc bx
+    cmp bx, buffer_size
+    jne .skip_wrap
+    xor bx, bx
+.skip_wrap:
+    mov [buffer_tail], bx
+    jmp .done
+
+.empty:
+    mov al, 0
+
+.done:
+    ret
+
+
+; -------------------------------
+; Simple Bump Allocator
+; -------------------------------
+free_segment dw 0x3000
+free_offset  dw 0x0000
+
+malloc:
+    push ax
+    push bx
+    push cx
+    push dx
+
+    mov ax, [free_segment]
+    mov es, ax
+    mov di, [free_offset]
+
+    add [free_offset], bx
+    jc .segment_wrap
+    jmp .done
+
+.segment_wrap:
+    add word [free_segment], 0x0010
+    mov word [free_offset], 0x0000
+
+.done:
     pop dx
     pop cx
     pop bx
+    pop ax
+    ret
+
+
+; ---------------------------------
+; Timer Interrupt Handler (INT 08h)
+; ---------------------------------
+tick_count dw 0
+
+timer_handler:
+    push ax
+    inc word [tick_count]
+    mov al, 0x20
+    out 0x20, al      ; EOI to master PIC
     pop ax
     iret
 
@@ -199,10 +333,10 @@ syscall_handler:
 irq_handler_template:
     pusha                   ; Save all general-purpose registers
     ; Add specific IRQ logic here (e.g., handling a COM port interrupt)
-    
+
     mov al, 0x20
     out 0x20, al            ; EOI to master PIC
-    
+
     popa                    ; Restore all general-purpose registers
     iret                    ; Return from interrupt
 
@@ -226,32 +360,6 @@ install_timer_handler:
     ret
 
 ; -------------------------------
-; Install Keyboard Handler into IVT
-; -------------------------------
-install_keyboard_handler:
-    cli
-    mov ax, cs
-    mov ds, ax
-    mov es, ax
-    mov word [0x0084], keyboard_handler
-    mov word [0x0086], cs
-    sti
-    ret
-
-; -------------------------------
-; Install System Call Handler (INT 60h)
-; -------------------------------
-install_syscall_handler:
-    cli
-    mov ax, cs
-    mov ds, ax
-    mov es, ax
-    mov word [0x0180], syscall_handler
-    mov word [0x0182], cs
-    sti
-    ret
-
-; -------------------------------
 ; Install IRQ 3-7 Handlers into IVT
 ; -------------------------------
 install_irq_handlers_3_to_7:
@@ -259,27 +367,27 @@ install_irq_handlers_3_to_7:
     mov ax, cs
     mov ds, ax
     mov es, ax
-    
+
     ; IRQ3 (INT 23h - IVT offset 0x8C)
     mov word [0x008C], irq3_handler
     mov word [0x008E], cs
-    
+
     ; IRQ4 (INT 24h - IVT offset 0x90)
     mov word [0x0090], irq4_handler
     mov word [0x0092], cs
-    
+
     ; IRQ5 (INT 25h - IVT offset 0x94)
     mov word [0x0094], irq5_handler
     mov word [0x0096], cs
-    
+
     ; IRQ6 (INT 26h - IVT offset 0x98)
     mov word [0x0098], irq6_handler
     mov word [0x009A], cs
-    
+
     ; IRQ7 (INT 27h - IVT offset 0x9C)
     mov word [0x009C], irq7_handler
     mov word [0x009E], cs
-    
+
     sti
     ret
 
@@ -353,7 +461,7 @@ init_pic:
     ret
 
 ; -------------------------------
-; Load Shell from Disk (sector 5)
+; Load Shell from Disk (sector 4)
 ; -------------------------------
 load_shell:
     push ax
@@ -366,7 +474,7 @@ load_shell:
     mov es, ax
     mov ax, 0x0201
     mov bx, 0x0000
-    mov cx, 0x0005
+    mov cx, 0x0004
     mov dx, 0x0000
     int 0x13
 
@@ -377,125 +485,6 @@ load_shell:
     pop ax
     ret
 
-; -------------------------------
-; Jump to Shell at 0x2000:0000
-; -------------------------------
-jump_to_shell:
-    jmp 0x2000:0000
-
-; -------------------------------
-; Print String Routine
-; -------------------------------
-print_string:
-    mov ah, 0x0E
-.next_char:
-    lodsb
-    cmp al, 0
-    je .done
-    int 0x10
-    jmp .next_char
-.done:
-    ret
-
-; -------------------------------
-; Keyboard Ring Buffer
-; -------------------------------
-buffer_size equ 64
-
-keyboard_buffer: times buffer_size db 0
-buffer_head: dw 0
-buffer_tail: dw 0
-
-buffer_put:
-    push ax
-    push bx
-    push cx
-    push dx
-
-    mov bx, [buffer_head]
-    mov cx, [buffer_tail]
-    mov dx, buffer_size
-    inc bx
-    cmp bx, dx
-    jne .skip_wrap
-    xor bx, bx
-.skip_wrap:
-    cmp bx, cx
-    je .full
-
-    mov si, keyboard_buffer
-    add si, [buffer_head]
-    mov [si], al
-    mov [buffer_head], bx
-
-.full:
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-    ret
-
-buffer_get:
-    push ax
-    push bx
-    push cx
-    push dx
-
-    mov bx, [buffer_tail]
-    cmp bx, [buffer_head]
-    je .empty
-
-    mov si, keyboard_buffer
-    add si, bx
-    mov al, [si]
-    inc bx
-    cmp bx, buffer_size
-    jne .skip_wrap
-    xor bx, bx
-.skip_wrap:
-    mov [buffer_tail], bx
-    jmp .done
-
-.empty:
-    mov al, 0
-
-.done:
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-    ret
-
-; -------------------------------
-; Simple Bump Allocator
-; -------------------------------
-free_segment dw 0x3000
-free_offset  dw 0x0000
-
-malloc:
-    push ax
-    push bx
-    push cx
-    push dx
-
-    mov ax, [free_segment]
-    mov es, ax
-    mov di, [free_offset]
-
-    add [free_offset], bx
-    jc .segment_wrap
-    jmp .done
-
-.segment_wrap:
-    add [free_segment], 0x0010
-    mov [free_offset], 0x0000
-
-.done:
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-    ret
 
 ; -------------------------------
 ; Scancode to ASCII Table
@@ -503,11 +492,11 @@ malloc:
 scancode_table:
     db 0, 27, '1','2','3','4','5','6','7','8','9','0','-','=', 8, 9
     db 'q','w','e','r','t','y','u','i','o','p','[',']',13, 0,'a','s'
-    db 'd','f','g','h','j','k','l',';',39,'`', 0,'\\','z','x','c','v'
+    db 'd','f','g','h','j','k','l',';',39,'`','\\','z','x','c','v'
     db 'b','n','m',',','.','/', 0, '*', 0, ' '
 
 ; -------------------------------
 ; Boot Message
 ; -------------------------------
 boot_drive db 0x00
-msg db "8088/OS Kernel Initialized", 0
+msg db 0x0d, 0x0a, "8088/OS Kernel Initialized", 0x0d, 0x0a, 0
