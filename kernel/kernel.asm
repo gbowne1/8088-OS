@@ -63,7 +63,14 @@ install_syscall_handler:
 ; Keyboard Interrupt Handler (INT 09h)
 ; ------------------------------------
 keyboard_handler:
-    pusha                            ;N.B >= 80186 instruction
+    pushf
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push bp
     push ds
     push es
 
@@ -90,9 +97,16 @@ keyboard_handler:
 
     pop es
     pop ds
-    popa                             ;N.B >= 80186 instruction
+    pop bp
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    popf
     iret
-
+ 
 key_tmp:    db 0
 ; -----------------------------
 ; System Call Handler (INT 60h)
