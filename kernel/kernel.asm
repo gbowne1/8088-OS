@@ -188,7 +188,6 @@ syscall_handler:
     mov ax, [tick_count]
     jmp .done
 
-
 .exec:
     push ax
     push bx
@@ -220,7 +219,6 @@ syscall_handler:
     popa
     mov al, byte cs:[key_tmp]
     iret
-
 
 ; -------------------------------
 ; Jump to Shell at 0x2000:0000
@@ -293,7 +291,6 @@ buffer_get:
 .done:
     ret
 
-
 ; -------------------------------
 ; Simple Bump Allocator
 ; -------------------------------
@@ -324,7 +321,6 @@ malloc:
     pop bx
     pop ax
     ret
-
 
 ; ---------------------------------
 ; Timer Interrupt Handler (INT 08h)
@@ -470,7 +466,6 @@ init_pic:
     ; 0xFF: Mask all IRQ lines
     mov al, 0xFF
     out 0x21, al    ; Write to Master PIC Data Port
-
     popf ; Restore interrupt flag
     ret
 
@@ -491,6 +486,7 @@ load_shell:
     mov cx, 0x0004
     mov dx, 0x0000
     int 0x13
+    jc .error
 
     pop es
     pop dx
@@ -499,6 +495,10 @@ load_shell:
     pop ax
     ret
 
+.error:
+    mov si, disk_err_msg
+    call print_string
+    jmp $
 
 ; -------------------------------
 ; Scancode to ASCII Table
