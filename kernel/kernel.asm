@@ -514,3 +514,4 @@ scancode_table:
 ; -------------------------------
 boot_drive db 0x00
 msg db 0x0d, 0x0a, "8088/OS Kernel Initialized", 0x0d, 0x0a, 0
+disk_err_msg db 0x0D,0x0A,"Disk read error!",0x0D,0x0A,0
