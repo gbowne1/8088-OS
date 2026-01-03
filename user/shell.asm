@@ -138,7 +138,7 @@ strcmp:
     jmp .next
 .notequal:
     mov al, 1
-.exit
+.exit:
     pop di
     pop si
     ret
