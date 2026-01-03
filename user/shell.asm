@@ -150,7 +150,7 @@ strcmp:
 
 zerospaces:
     push si
-.next
+.next:
     lodsb
     cmp al,0
     je .exit
@@ -158,7 +158,7 @@ zerospaces:
     jne .next
     mov byte [si-1], 0
     jmp .next
- .exit
+ .exit:
     pop si
     ret
     
