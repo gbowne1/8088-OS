@@ -106,7 +106,7 @@ keyboard_handler:
     pop ax
     popf
     iret
- 
+
 key_tmp:    db 0
 ; -----------------------------
 ; System Call Handler (INT 60h)
@@ -153,6 +153,17 @@ syscall_handler:
     call malloc      ; Perform the allocation (which uses BX)
     pop cx           ; Restore CX
 
+    ; Check if malloc failed (returns ES=0, DI=0)
+    mov ax, es
+    or ax, di
+    jnz .malloc_ok      ; Non-zero means success
+
+    ; Out of memory (print error msg and hang)
+    mov si, oom_msg
+    call print_string
+    jmp $
+
+.malloc_ok:
     ; Return the allocated segment (ES) in AX and offset (DI) in BX
     ; NOTE: malloc currently returns segment in ES and offset in DI
     mov ax, es
@@ -298,10 +309,15 @@ buffer_get:
     ret
 
 ; -------------------------------
-; Simple Bump Allocator
+; Heap Allocator with Bounds Checking
+; -------------------------------
+; Heap range: 0x3000:0000 to 0x4FFF:FFFF (128KB)
+; Returns: ES:DI = allocated memory (or 0:0 if failed)
+; Input: BX = size in bytes
 ; -------------------------------
 free_segment dw 0x3000     ; Heap starts at 0x3000:0000
 free_offset  dw 0x0000
+heap_max_segment dw 0x5000 ; MUST NOT reach 0x5000 (exec region)
 
 malloc:
     push ax
@@ -309,17 +325,41 @@ malloc:
     push cx
     push dx
 
+    ; Get current segment and check bounds
     mov ax, [free_segment]
-    mov es, ax
-    mov di, [free_offset]
+    mov cx, [heap_max_segment]
+    cmp ax, cx
+    jae .out_of_memory        ; Already at or past limit
 
-    add [free_offset], bx
-    jc .segment_wrap
+    ; Try to allocate in current segment
+    mov dx, [free_offset]
+    add dx, bx                ; New offset after allocation
+    jnc .alloc_current        ; No overflow, we're good
+
+    ; Offset would overflow - need new segment
+    inc ax                    ; Move to next segment (adds 0x10 to address)
+    cmp ax, cx
+    jae .out_of_memory        ; Would exceed heap limit
+
+    ; Allocation spans into next segment
+    mov [free_segment], ax
+    mov [free_offset], bx     ; Start at bx in new segment
+    mov es, ax
+    xor di, di                ; Return DI=0 in new segment
     jmp .done
 
-.segment_wrap:
-    add word [free_segment], 0x0010
-    mov word [free_offset], 0x0000
+.alloc_current:
+    ; Allocation fits in current segment
+    mov es, ax
+    mov di, [free_offset]     ; Return current offset
+    mov [free_offset], dx     ; Update to new offset
+    jmp .done
+
+.out_of_memory:
+    ; Return NULL pointer (ES=0, DI=0)
+    xor ax, ax
+    mov es, ax
+    xor di, di
 
 .done:
     pop dx
@@ -521,3 +561,4 @@ scancode_table:
 boot_drive db 0x00
 msg db 0x0d, 0x0a, "8088/OS Kernel Initialized", 0x0d, 0x0a, 0
 disk_err_msg db 0x0D,0x0A,"Disk read error!",0x0D,0x0A,0
+oom_msg db 0x0D,0x0A,"Out of memory!",0x0D,0x0A,0
