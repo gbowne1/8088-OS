@@ -48,6 +48,11 @@ read_line:
     call print_string
     pop si
 
+    ; Print bell character (beeps)
+    mov al, 0x07
+    mov ah, 0x02
+    int 0x60
+
     mov byte [buffer_warned], 1     ; set warning flag
     jmp .read_char
 .done:
@@ -185,7 +190,7 @@ clear_cmd db "clear", 0
 help_cmd db "help", 0
 help_text db 0x0d, 0x0a, "Commands: echo, clear, help", 13, 10, 0
 string_crlf db 0x0d, 0x0a, 0
-buffer_full_msg db "Buffer full! - press enter", 0
+buffer_full_msg db 0x0D, 0x0A, "[Buffer full! - Press Enter to continue]", 0x0D, 0x0A, 0
 buffer_warned db 0      ; Flag to track if warned or not
 
 line_buffer: times buffer_size db 0
