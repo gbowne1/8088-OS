@@ -23,6 +23,7 @@ start:
 ; -------------------------------
 read_line:
     mov di, 0
+    mov byte [buffer_warned], 0     ; reset warning flag
 .read_char:
     mov ah, 0x01
     int 0x60
@@ -31,11 +32,23 @@ read_line:
     cmp al, 0x0D
     je .done
     cmp di, buffer_size
-    jae .read_char
+    jae .buffer_full
     mov [line_buffer + di], al
     inc di
     mov ah, 0x02
     int 0x60
+    jmp .read_char
+.buffer_full:
+    cmp byte [buffer_warned], 1
+    je .read_char       ; skip warning if already warned
+
+    ; Visual feedback (print a warning message)
+    push si
+    mov si, buffer_full_msg
+    call print_string
+    pop si
+
+    mov byte [buffer_warned], 1     ; set warning flag
     jmp .read_char
 .done:
     mov byte [line_buffer + di], 0
@@ -47,7 +60,7 @@ read_line:
 parse_command:
     mov si, line_buffer
     call zerospaces
-    
+
     mov si, line_buffer
     mov di, echo_cmd
     call strcmp
@@ -161,7 +174,7 @@ zerospaces:
  .exit:
     pop si
     ret
-    
+
 ; -------------------------------
 ; Data Section
 ; -------------------------------
@@ -172,5 +185,7 @@ clear_cmd db "clear", 0
 help_cmd db "help", 0
 help_text db 0x0d, 0x0a, "Commands: echo, clear, help", 13, 10, 0
 string_crlf db 0x0d, 0x0a, 0
-    
+buffer_full_msg db "Buffer full! - press enter", 0
+buffer_warned db 0      ; Flag to track if warned or not
+
 line_buffer: times buffer_size db 0
