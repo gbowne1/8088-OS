@@ -1,3 +1,9 @@
+# Emulator settings: ISA-only machine, 1MB real-mode memory, floppy boot
+QEMU = qemu-system-i386
+QEMUFLAGS = -M isapc -m 1M -cpu 486 \
+            -drive file=$(FLOPPY_IMG),format=raw,if=floppy \
+            -boot a
+
 # Directories
 BOOTLOADER_DIR = bootloader
 KERNEL_DIR     = kernel
@@ -36,7 +42,13 @@ $(KERNEL_BIN): $(KERNEL_DIR)/kernel.asm | $(BUILD_DIR)
 $(SHELL_BIN): $(USER_DIR)/shell.asm | $(BUILD_DIR)
 	$(ASM) $(ASMFLAGS) $< -o $@
 
+run: all
+	$(QEMU) $(QEMUFLAGS)
+
+run-debug: all
+	$(QEMU) $(QEMUFLAGS) -S -s
+
 clean:
 	rm -rf $(BUILD_DIR)
 
-.PHONY: all clean
+.PHONY: all run run-debug clean
