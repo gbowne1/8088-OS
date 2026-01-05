@@ -267,6 +267,7 @@ buffer_head: dw 0
 buffer_tail: dw 0
 
 buffer_put:
+    cli
     mov bx, [buffer_head]
     mov cx, [buffer_tail]
     mov dx, buffer_size
@@ -282,11 +283,15 @@ buffer_put:
     add si, [buffer_head]
     mov [si], al
     mov [buffer_head], bx
+    sti
+    ret
 
 .full:
+    sti
     ret
 
 buffer_get:
+    cli
     mov bx, [buffer_tail]
     cmp bx, [buffer_head]
     je .empty
@@ -300,10 +305,14 @@ buffer_get:
     xor bx, bx
 .skip_wrap:
     mov [buffer_tail], bx
+    sti
+    ret
     jmp .done
 
 .empty:
     mov al, 0
+    sti
+    ret
 
 .done:
     ret
