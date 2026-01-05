@@ -31,6 +31,8 @@ read_line:
     je .read_char
     cmp al, 0x0D
     je .done
+    cmp al, 0x08        ; Backspace?
+    je .handle_backspace
     cmp di, buffer_size
     jae .buffer_full
     mov [line_buffer + di], al
@@ -38,6 +40,24 @@ read_line:
     mov ah, 0x02
     int 0x60
     jmp .read_char
+
+.handle_backspace:
+    cmp di, 0       ; Buffer empty?
+    je .read_char
+    dec di          ; Remove the buffer
+
+    ; Erase from screen: backspace, space, backspace
+    mov al, 0x08
+    mov ah, 0x02
+    int 0x60
+    mov al, ' '
+    mov ah, 0x02
+    int 0x60
+    mov al, 0x08
+    mov ah, 0x02
+    int 0x60
+    jmp .read_char
+
 .buffer_full:
     cmp byte [buffer_warned], 1
     je .read_char       ; skip warning if already warned
