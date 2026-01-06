@@ -84,7 +84,7 @@ read_line:
 ; -------------------------------
 parse_command:
     mov si, line_buffer
-    call zerospaces
+    call tokenize
 
     mov si, line_buffer
     mov di, echo_cmd
@@ -123,8 +123,13 @@ parse_command:
 echo_handler:
     mov si, string_crlf
     call print_string
-    mov si, line_buffer + 5
+
+    mov si, [args_ptr]
+    cmp si, 0
+    je .done
+
     call print_string
+.done:
     ret
 
 ; -------------------------------
@@ -186,17 +191,35 @@ strcmp:
     pop si
     ret
 
-zerospaces:
+tokenize:
     push si
-.next:
+    mov si, line_buffer
+    mov word [args_ptr], 0
+
+.skip_leading:
     lodsb
-    cmp al,0
-    je .exit
-    cmp al,' '
-    jne .next
+    cmp al, ' '
+    je .skip_leading
+    dec si
+
+.find_space:
+    lodsb
+    cmp al, 0
+    je .done
+    cmp al, ' '
+    jne .find_space
+
+    ; terminate command
     mov byte [si-1], 0
-    jmp .next
- .exit:
+
+.skip_spaces:
+    lodsb
+    cmp al, ' '
+    je .skip_spaces
+    dec si
+
+    mov [args_ptr], si
+.done:
     pop si
     ret
 
@@ -212,5 +235,6 @@ help_text db 0x0d, 0x0a, "Commands: echo, clear, help", 13, 10, 0
 string_crlf db 0x0d, 0x0a, 0
 buffer_full_msg db 0x0D, 0x0A, "[Buffer full! - Press Enter to continue]", 0x0D, 0x0A, 0
 buffer_warned db 0      ; Flag to track if warned or not
+args_ptr dw 0           ; Pointer to command arguments
 
 line_buffer: times buffer_size db 0
