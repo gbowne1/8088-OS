@@ -104,12 +104,48 @@ keyboard_handler:
     cmp al, 0x38
     je .left_alt_press
 
-    ; Normal key - check if shift is pressed
+    ; Check for Caps Lock press (0x3A)
+    cmp al, 0x3A
+    je .caps_lock_toggle
+
+    ; Normal key - check modifiers
+    ; Caps Lock affects letter keys
+    ; (scancodes 0x10-0x19 = Q-P, 0x1E-0x26 = A-L, 0x2C-0x32 = Z-M)
+
     mov cl, [shift_pressed]
+    mov ch, [caps_lock]
+
+    ; Check if this is a letter key
+    cmp al, 0x10
+    jb .not_letter          ; Below Q
+    cmp al, 0x32
+    ja .not_letter          ; Above M
+
+    ; It's a letter - check ranges
+    cmp al, 0x19
+    jbe .is_letter          ; Q-P range
+    cmp al, 0x1E
+    jb .not_letter
+    cmp al, 0x26
+    jbe .is_letter          ; A-L range
+    cmp al, 0x2C
+    jb .not_letter
+    ; Z-M range (already checked <= 0x32)
+
+.is_letter:
+    ; For letters: Shift XOR Caps Lock determines uppercase
+    xor cl, ch              ; CL = shift XOR caps
+    jmp .select_table
+
+.not_letter:
+    ; For non-letters: Only shift matters (ignore caps lock)
+    ; CL already has shift_pressed
+
+.select_table:
     test cl, cl
     jz .use_normal_table
 
-    ; Shift is pressed - use shifted key
+    ; Use shifted table
     xor ah, ah
     mov bx, ax
     mov si, scancode_table_shift
@@ -142,6 +178,10 @@ keyboard_handler:
 
 .left_alt_press:
     or byte [alt_pressed], 0x01     ; set bit 0
+    jmp .done
+
+.caps_lock_toggle:
+    xor byte [caps_lock], 0x01      ; toggle bit 0
     jmp .done
 
 .key_release:
