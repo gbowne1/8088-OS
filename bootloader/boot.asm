@@ -11,8 +11,8 @@ start:
 
     mov ax, 0x0800
     mov es, ax
-    mov ax, 0x0202        ; INT 13h: read 2 sectors
-    mov cx, 0x0002        
+    mov ax, 0x0203        ; INT 13h: read 3 sectors
+    mov cx, 0x0002
     mov bx, 0x0000
     mov dx, 0x0000
     int 0x13

@@ -31,7 +31,7 @@ $(FLOPPY_IMG): $(BOOTLOADER_BIN) $(KERNEL_BIN) $(SHELL_BIN) | $(BUILD_DIR)
 	dd if=/dev/zero of=$(FLOPPY_IMG) bs=512 count=2880
 	dd if=$(BOOTLOADER_BIN) of=$(FLOPPY_IMG) bs=512 seek=0 conv=notrunc
 	dd if=$(KERNEL_BIN)     of=$(FLOPPY_IMG) bs=512 seek=1 conv=notrunc
-	dd if=$(SHELL_BIN)      of=$(FLOPPY_IMG) bs=512 seek=3 conv=notrunc
+	dd if=$(SHELL_BIN)      of=$(FLOPPY_IMG) bs=512 seek=4 conv=notrunc
 
 $(BOOTLOADER_BIN): $(BOOTLOADER_DIR)/boot.asm | $(BUILD_DIR)
 	$(ASM) $(ASMFLAGS) $< -o $@

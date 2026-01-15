@@ -717,7 +717,7 @@ load_shell:
     mov es, ax
     mov ax, 0x0201
     mov bx, 0x0000
-    mov cx, 0x0004
+    mov cx, 0x0005          ; Start reading shell from sector 5
     mov dx, 0x0000
     int 0x13
     jc .error
